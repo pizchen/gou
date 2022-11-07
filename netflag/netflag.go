@@ -17,6 +17,26 @@ const (
 	DADDR_MSK = (1 << 4)
 	SADDR_MSK = (1 << 5)
 	EADDR_MSK = (1 << 6)
+
+	PROTO_ICMP  = 1
+	PROTO_ICMP6 = 58
+	PROTO_TCP   = 6
+	PROTO_UDP   = 17
+)
+
+var (
+	ProtoStr = map[byte]string{
+		PROTO_ICMP:  "icmp",
+		PROTO_ICMP6: "icmp6",
+		PROTO_TCP:   "tcp",
+		PROTO_UDP:   "udp",
+	}
+	ProtoValue = map[string]byte{
+		"icmp":  PROTO_ICMP,
+		"icmp6": PROTO_ICMP6,
+		"tcp":   PROTO_TCP,
+		"udp":   PROTO_UDP,
+	}
 )
 
 type Netaddr struct {
@@ -31,6 +51,8 @@ type NetaddrConfig struct {
 	V4msk []byte
 	V6msk []byte
 	Flag  byte
+	Ipver byte
+	Proto byte
 }
 
 func procAddrString(addr string) (*Netaddr, error) {
@@ -56,7 +78,7 @@ func procAddrString(addr string) (*Netaddr, error) {
 				goto INVALID
 			}
 		} else if len(parts) == 1 {
-			port, err = strconv.Atoi(parts[1])
+			port, err = strconv.Atoi(parts[0])
 			if err != nil || na.Port > 65535 {
 				goto INVALID
 			}
@@ -119,6 +141,8 @@ var (
 		Dst   aflag.ArrayFlagString
 		V4msk uint
 		V6msk uint
+		Ipver uint
+		Proto string
 	}
 )
 
@@ -128,6 +152,8 @@ func FlagAdd() {
 	flag.Var(&Args.Host, "host", "Match src/dst address: IP@PORT, comma separated list or repeated")
 	flag.UintVar(&Args.V4msk, "msk4", 0, "ipv4 address netmask bits number")
 	flag.UintVar(&Args.V6msk, "msk6", 0, "ipv6 address netmask bits number")
+	flag.UintVar(&Args.Ipver, "ipver", 0, "IP version")
+	flag.StringVar(&Args.Proto, "proto", "", "Match IP layer payload protocol")
 }
 
 func FlagParse() (*NetaddrConfig, error) {
@@ -139,6 +165,8 @@ func FlagParse() (*NetaddrConfig, error) {
 		V4msk: net.CIDRMask(32, 32),
 		V6msk: net.CIDRMask(128, 128),
 		Flag:  0,
+		Ipver: 0,
+		Proto: 0,
 	}
 	var err error
 
@@ -202,6 +230,17 @@ func FlagParse() (*NetaddrConfig, error) {
 		if cfg.Daddr[0].Port > 0 {
 			cfg.Flag |= DPORT_MSK
 		}
+	}
+
+	if Args.Ipver > 0 && (Args.Ipver == 4 || Args.Ipver == 6) {
+		cfg.Ipver = byte(Args.Ipver)
+	}
+
+	if len(Args.Proto) > 0 {
+		if _, ok := ProtoValue[Args.Proto]; !ok {
+			return nil, fmt.Errorf("Unknown protocol -proto %v\n", Args.Proto)
+		}
+		cfg.Proto = ProtoValue[Args.Proto]
 	}
 
 	return cfg, nil
