@@ -5,7 +5,7 @@ import (
 )
 
 func Bytes2String(b []byte) string {
-	pos = bytes.IndexByte(b, 0x0)
+	pos := bytes.IndexByte(b, 0x0)
 	if pos == -1 {
 		pos = len(b)
 	}
